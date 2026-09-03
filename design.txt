@@ -1,0 +1,158 @@
+===============================================
+兔吃了么 · 沈星回每日饮食插件 (v4 · 定稿)
+xavier_daily_meal
+===============================================
+
+【一、目标】
+让 QQ 那边的沈星回每天"吃"得不一样，有烟火气。
+按需注入 · 静默 · 不改人设 · 兜底不联网也能跑。
+
+【二、类型】
+LLM Hook（@filter.on_llm_request），无用户指令。
+
+【三、核心机制】
+
+1) 触发条件（关键词按需注入）
+   - 扫 user 消息，命中 meal 关键词才注入
+   - 关键词：吃/喝/饿/饱/馋/早饭/早餐/午饭/午餐/晚饭/
+            晚餐/夜宵/零食/小吃/外卖/点餐/食堂/菜/面/饭/
+            汤/肉/口味/胃口
+   - 没命中 → return，一动不动
+
+2) 人格过滤
+   - target_persona (默认 "沈星回")
+   - 从 req.system_prompt 里搜关键字，命中才注入
+   - 空串 = 不过滤
+
+3) 会话隔离
+   - 入口先 SessionPluginManager.is_plugin_enabled_for_session
+   - 禁用 → return
+
+4) 今日菜单获取（三层兜底 · 一天一次）
+   a. 先读 history.json，有今天的直接用
+   b. 没有 → 调 LLM 生成，成功则存缓存
+   c. LLM 失败 / 无 provider → 本地池 + 模板兜底生成
+
+5) 注入内容（务必简短，不重复人设）
+   格式：
+     [今日吃食] 早X ｜ 午Y ｜ 晚Z(｜ 加 W)
+     (被问到时自然带出，别主动罗列)
+
+   按时段截断：
+     5-10   早X
+     11-14  早X｜午Y
+     15-17  早X｜午Y
+     18-22  早X｜午Y｜晚Z
+     23-4   早X｜午Y｜晚Z(｜想吃 W)
+
+   仅 1 行。整段控制在 60 汉字以内。
+
+【四、菜单生成 —— 本地兜底】
+
+■ 静态池
+  breakfast/lunch/dinner/snack
+  街边 + 家常 + 世界书心头好，80+ 项，全可配置
+
+■ 模板生成器（离线现搓）
+  - 面食：配料 × 做法
+  - 汤类：配料 + "汤"
+  - 炒饭/盖饭：配料 × 载体
+  - 粥类：配料 + "粥"
+  - 烧烤：随机组合 2-3 单品
+
+  比例：template_ratio 默认 0.4
+
+【五、LLM 生成 —— 主路径】
+  provider = self.context.get_using_provider()
+  prompt: 给沈星回排今日菜单（早/中/晚/加餐），
+          街边小吃 + 家常 + 精致小食皆可，
+          考虑节气(处暑/立秋等)，返回严格 JSON:
+          {"breakfast":"","lunch":"","dinner":"","snack":""}
+  system_prompt 走轻量 role 描述，不搬人设
+  失败/超时 → 本地兜底
+
+【六、缓存 history.json】
+  结构：
+  {
+    "2026-09-01": {"breakfast":"...","lunch":"...",
+                   "dinner":"...","snack":"..."},
+    ...
+  }
+  自动裁剪：保留最近 dedup_days*2 天（默认 14）
+  文件路径：StarTools.get_data_dir()/history.json
+
+【七、配置项 _conf_schema.json】
+- enable_inject       bool   默认 true
+- use_llm_gen         bool   默认 true
+- dedup_days          int    默认 7（LLM 生成时 avoid 用）
+- include_snack       bool   默认 true
+- template_ratio      float  默认 0.4
+- target_persona      str    默认 "沈星回"
+- trigger_keywords    list   触发词
+- foods_breakfast     list
+- foods_lunch         list
+- foods_dinner        list
+- foods_snack         list
+- template_noodle_ing / style
+- template_soup_ing
+- template_rice_ing / style
+- template_porridge_ing
+- template_bbq_items
+
+【八、文件】
+main.py            主逻辑 + LLM hook + Web 服务
+metadata.yaml      元信息
+_conf_schema.json  配置
+web/index.html     前端页面（单文件，纯静态）
+requirements.txt   仅一行：aiohttp（其实 AstrBot 已带，兜底列出）
+
+【九、前端（独立小网页）】
+
+▲ 定位：仅本机使用，管理 / 查看今日兔子(沈星回)的饭
+   插件启动时用 aiohttp 起一个内置 HTTP 服务：
+     host = 127.0.0.1
+     port = 可配置，默认 17334（跟主端口错开）
+
+▲ 页面（单文件 HTML，粉色兔子主题）
+   顶栏：兔吃了么 · 今天沈星回吃了什么
+   1. 今日菜单卡片
+      - 早 / 午 / 晚 / 加餐 四个卡格
+      - 每格右上角一个"再摇"按钮 → POST /api/reroll?slot=lunch
+      - 底部一个大按钮 "整份重摇"
+   2. 手动追加
+      - 小输入框 + 下拉(选餐段) + 「加进食物库」按钮
+      - → POST /api/add_food {slot, name}
+   3. 历史七日
+      - 表格：日期 | 早 | 午 | 晚 | 加餐
+      - 只读
+
+▲ API 路由
+   GET  /                     → index.html
+   GET  /api/today            → 今日菜单 JSON
+   GET  /api/history          → 最近 N 天历史
+   POST /api/reroll           → body:{slot?} 无 slot 全摇
+   POST /api/add_food         → body:{slot,name}
+   GET  /api/pool             → 当前食物库（合并 config + 用户追加）
+
+▲ 用户追加落盘：
+   StarTools.get_data_dir()/user_pool.json
+   {breakfast:[], lunch:[], dinner:[], snack:[]}
+   与 config 里 foods_* 合并使用
+
+▲ 生命周期
+   initialize:  启 aiohttp app + Runner + TCPSite
+   terminate:   await site.stop() / runner.cleanup()
+
+▲ 安全
+   仅 127.0.0.1 监听，不对外
+   静态 HTML 不含任何 CDN，全部离线
+
+【十、工程规范】
+- async 全程
+- json 用 asyncio.to_thread 包裹
+- logger + try/except
+- StarTools.get_data_dir()
+- 不用 requests / print
+- 前端资源内联在 main.py 中的 HTML 常量或从 web/index.html 读
+
+===============================================

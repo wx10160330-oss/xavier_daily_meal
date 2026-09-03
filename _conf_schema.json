@@ -1,0 +1,92 @@
+{
+  "enable_inject": {
+    "type": "bool",
+    "description": "启用饮食注入",
+    "default": true
+  },
+  "use_llm_gen": {
+    "type": "bool",
+    "description": "用 LLM 生成菜单",
+    "default": true
+  },
+  "llm_ratio": {
+    "type": "float",
+    "description": "LLM 生成菜单的概率（0.0 ~ 1.0）",
+    "hint": "1.0 = 总是优先用 LLM 生成；0.0 = 完全不用 LLM（只走本地食物库）；0.5 = 一半天数走 LLM，一半天数走本地库抽卡。LLM 失败时依然会自动回退到本地库。",
+    "default": 1.0
+  },
+  "llm_provider_id": {
+    "type": "string",
+    "description": "LLM 生成用的 provider（留空=用当前会话默认的）",
+    "hint": "在 AstrBot「服务提供商」页配置过的 provider 都会出现在下拉框里；想让菜单生成用小号模型省 quota 就选个便宜的",
+    "_special": "select_provider",
+    "default": ""
+  },
+  "dedup_days": {
+    "type": "int",
+    "description": "去重滑窗天数",
+    "default": 7
+  },
+  "include_snack": {
+    "type": "bool",
+    "description": "包含加餐/甜点",
+    "default": true
+  },
+  "lazy_ratio": {
+    "type": "float",
+    "description": "摆烂概率 0-1，越大越常一顿只吃一样",
+    "default": 0.4
+  },
+  "weird_ratio": {
+    "type": "float",
+    "description": "怪味出现概率 0-1，默认 0.1",
+    "default": 0.1
+  },
+  "trigger_keywords": {
+    "type": "list",
+    "description": "命中任一关键词才注入，留空=不过滤",
+    "default": []
+  },
+  "snippet_template": {
+    "type": "text",
+    "description": "注入 system_prompt 的模板",
+    "hint": "支持占位符：{menu}=拼好的整句（早X｜午Y｜晚Z｜想吃W），{breakfast}/{lunch}/{dinner}/{snack}=各餐单独字段（无内容自动填「（无）」）。清空即回退到内置默认。",
+    "default": "[今日吃食] {menu}（被问到时自然带出，别主动罗列、别复读；请结合当前时间判断该聊哪一顿：还没吃就说打算吃，吃过了就说吃过了）"
+  },
+  "gen_prompt_template": {
+    "type": "text",
+    "description": "LLM 生成菜单时用的 prompt 模板",
+    "hint": "支持占位符：{today}=今天日期，{season_hint}=节气/时令，{recent}=最近吃过要避开的。清空即回退默认。\n\n⚠️ 必须保留的硬性要求（缺一个都会让菜单解析失败）：\n1) 让 LLM 只返回一个严格 JSON 对象，不要多余文字、不要 markdown 代码块围栏；\n2) JSON 的键必须是 breakfast/lunch/dinner/snack 这四个（少一个就少一顿）；\n3) 值是菜名字符串，可用「+」连接多样搭配。\n\n可以随便改的：口味描述、风格倾向、要不要贴合节气、给菜品限定地域等。想让菜单变清淡/变精致/变家常，改这里就行。",
+    "default": "给他排一份今天的饮食（早/午/晚/加餐）。要求：\n1. 早/午/晚各 1 项，加餐 1 项（不需要就给空字符串）。\n2. 追求真实生活感，街边小吃 / 家常菜 / 精致小食都可以，避免连锁快餐凑数。\n3. 他是重度肉食+嗜甜口味，喜辣，也偶尔会来点清奇怪味。\n4. 今天是 {today}，节气/时令：{season_hint}，可以适当贴合。\n5. 避开最近吃过的：{recent}\n6. 只返回一个严格 JSON 对象，键为 breakfast/lunch/dinner/snack，值为菜名字符串（可以是一顿的多样搭配，用 + 连接），不要任何多余文字、不要 markdown 代码块围栏。\n示例：{{\"breakfast\":\"煎饼果子+豆浆\",\"lunch\":\"红烧肉+白粥+冬瓜排骨汤\",\"dinner\":\"麻辣香锅\",\"snack\":\"焦糖蛋挞\"}}"
+  },
+  "gen_system_prompt": {
+    "type": "text",
+    "description": "LLM 生成菜单时的 system_prompt",
+    "hint": "定人设/口吻用。清空即回退默认。",
+    "default": "你是一个菜单助手。只返回严格 JSON，不要解释、不要 markdown 代码块。"
+  },
+  "web_enable": {
+    "type": "bool",
+    "description": "启动小网页",
+    "default": true
+  },
+  "web_host": {
+    "type": "string",
+    "description": "监听地址：本机选 127.0.0.1，云服务器选 0.0.0.0",
+    "default": "127.0.0.1",
+    "options": [
+      "127.0.0.1",
+      "0.0.0.0"
+    ]
+  },
+  "web_port": {
+    "type": "int",
+    "description": "端口，云服务器记得开安全组",
+    "default": 17334
+  },
+  "web_token": {
+    "type": "string",
+    "description": "访问密码，0.0.0.0 必填",
+    "default": ""
+  }
+}

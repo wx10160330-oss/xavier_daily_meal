@@ -1,0 +1,10 @@
+name: xavier_daily_meal
+display_name: 兔吃了么
+desc: 每天生成一份不重样的饮食底稿（早/午/晚/加餐），仅在 LLM 回复前静默注入 system_prompt。支持指定 provider 生成 + 本地权重池兜底；一份统一食物库（love/cat/time/weird 四标签），附带小网页可查看/重摇/管理食物库。
+short_desc: 每日饮食底稿注入插件
+version: 2.0.0
+author: 可可
+repo: "https://github.com/wx10160330-oss/xavier_daily_meal"
+support_platforms:
+  - all
+astrbot_version: ">=4.0.0"
