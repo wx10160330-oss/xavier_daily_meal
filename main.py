@@ -62,7 +62,10 @@ DEFAULT_SNIPPET_TEMPLATE = (
 
 LOVE_WEIGHT = {2: 5.0, 1: 2.0, 0: 0.5}
 TIME_MATCH_MULT = 1.8
-TIME_MISS_MULT = 0.35
+TIME_MISS_MULT = 0.02
+# 硬过滤兜底阈值：如果按 time 标签硬过滤后候选池小于这个数，
+# 就降级回软权重模式（含未打标 + 打了标但不匹配的），避免抽不出东西。
+TIME_STRICT_MIN_POOL = 2
 
 LLM_MENU_PROMPT_TEMPLATE = (
     "给他排一份今天的饮食（早/午/晚/加餐）。要求：\n"
@@ -383,6 +386,16 @@ class XavierDailyMeal(Star):
         pool = [f for f in candidates if f.get("name") and f["name"] not in used]
         if not pool:
             pool = candidates  # 全用过了就允许重复
+
+        # 硬过滤：优先只保留【匹配当前时段】或【未打 time 标签的通用食物】
+        # 只有当过滤后候选池太小（< TIME_STRICT_MIN_POOL）时，才降级回全池 + 软权重
+        strict_pool = [
+            f for f in pool
+            if not f.get("time") or slot_tag in (f.get("time") or [])
+        ]
+        if len(strict_pool) >= TIME_STRICT_MIN_POOL:
+            pool = strict_pool
+
         weights = [max(self._weight(f, slot_tag, weird_ratio), 0.0001) for f in pool]
         try:
             picked = rng.choices(pool, weights=weights, k=1)[0]

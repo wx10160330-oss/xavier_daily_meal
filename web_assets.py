@@ -262,6 +262,14 @@ INDEX_HTML = r"""<!doctype html>
       <option value="1">⭐ 喜欢</option>
       <option value="0">一般</option>
     </select>
+    <select class="filter-select" id="food-filter-time" onchange="renderFoodsTable()">
+      <option value="">全部时段</option>
+      <option value="早">🍞 早餐</option>
+      <option value="午">🍚 午餐</option>
+      <option value="晚">🍜 晚餐</option>
+      <option value="加">🍰 加餐</option>
+      <option value="__none__">未标时段</option>
+    </select>
     <button class="btn" onclick="addFoodRow()">➕ 加一道菜</button>
     <span class="badge-count" id="food-count">0 道菜</span>
   </div>
@@ -395,6 +403,7 @@ function renderFoodsTable(){
   const kw = (document.getElementById('food-search').value || '').trim().toLowerCase();
   const fCat = document.getElementById('food-filter-cat').value;
   const fLove = document.getElementById('food-filter-love').value;
+  const fTime = document.getElementById('food-filter-time').value;
 
   tbody.innerHTML = '';
   let count = 0;
@@ -403,6 +412,14 @@ function renderFoodsTable(){
     if(kw && !item.name.toLowerCase().includes(kw)) return;
     if(fCat && item.cat !== fCat) return;
     if(fLove !== '' && String(item.love) !== fLove) return;
+    if(fTime){
+      const times = item.time || [];
+      if(fTime === '__none__'){
+        if(times.length > 0) return;
+      } else {
+        if(!times.includes(fTime)) return;
+      }
+    }
     count++;
 
     const tr = document.createElement('tr');
